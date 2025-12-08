@@ -1,0 +1,39 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Build Release
+        run: |
+          cd QuickTodo
+          xcodebuild -scheme QuickTodo -configuration Release build \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CONFIGURATION_BUILD_DIR=build/Release
+
+      - name: Create DMG
+        run: |
+          cd QuickTodo
+          mkdir -p build/dmg
+          cp -R build/Release/QuickTodo.app build/dmg/
+          ln -s /Applications build/dmg/Applications
+          hdiutil create -volname "QuickTodo" -srcfolder build/dmg -ov -format UDZO build/QuickTodo.dmg
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: QuickTodo/build/QuickTodo.dmg
+          generate_release_notes: true
