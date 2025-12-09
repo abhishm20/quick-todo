@@ -202,8 +202,9 @@ struct SettingsView: View {
             panel.directoryURL = url.deletingLastPathComponent()
         }
 
-        // Use non-blocking begin() to avoid interfering with SwiftUI sheet state
-        panel.begin { [self] response in
+        guard let window = NSApp.keyWindow else { return }
+
+        panel.beginSheetModal(for: window) { [self] response in
             if response == .OK, let url = panel.url {
                 todoStore.updateStoragePath(url)
                 dataPath = url.path
