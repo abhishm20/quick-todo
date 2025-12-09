@@ -21,11 +21,23 @@ A lightning-fast menubar todo app for macOS.
 
 Download the latest DMG from the [Releases](https://github.com/abhishm20/quick-todo/releases) page.
 
+**Important:** Since the app is not notarized with Apple, macOS may show "damaged" or "unidentified developer" warnings. To fix this, run in Terminal after mounting the DMG:
+
+```bash
+xattr -cr /Volumes/QuickTodo/QuickTodo.app
+```
+
+Or after copying to Applications:
+
+```bash
+xattr -cr /Applications/QuickTodo.app
+```
+
 ### Build from Source
 
 ```bash
 git clone https://github.com/abhishm20/quick-todo.git
-cd quick-todo/QuickTodo
+cd quick-todo
 open QuickTodo.xcodeproj
 ```
 
@@ -76,18 +88,21 @@ You can change this location in Settings, or sync the file via iCloud/Dropbox/gi
 ## Project Structure
 
 ```
-QuickTodo/
-├── QuickTodoApp.swift       # App entry, menubar setup
-├── Models/
-│   └── Todo.swift           # Todo data model
-├── Views/
-│   ├── ContentView.swift    # Main popover view
-│   ├── TodoRowView.swift    # Individual todo row
-│   └── SettingsView.swift   # Settings panel
-└── Services/
-    ├── TodoStore.swift      # Data persistence
-    ├── HotkeyManager.swift  # Global shortcuts
-    └── KeyboardHandler.swift # Keyboard navigation
+quick-todo/
+├── QuickTodo/                # Source files
+│   ├── QuickTodoApp.swift    # App entry, menubar setup
+│   ├── Models/
+│   │   └── Todo.swift        # Todo data model
+│   ├── Views/
+│   │   ├── ContentView.swift # Main popover view
+│   │   ├── TodoRowView.swift # Individual todo row
+│   │   └── SettingsView.swift# Settings panel
+│   └── Services/
+│       ├── TodoStore.swift   # Data persistence
+│       ├── HotkeyManager.swift # Global shortcuts
+│       └── KeyboardHandler.swift # Keyboard navigation
+├── QuickTodo.xcodeproj/
+└── scripts/
 ```
 
 ## Contributing
