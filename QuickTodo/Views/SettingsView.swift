@@ -202,9 +202,12 @@ struct SettingsView: View {
             panel.directoryURL = url.deletingLastPathComponent()
         }
 
-        if panel.runModal() == .OK, let url = panel.url {
-            todoStore.updateStoragePath(url)
-            dataPath = url.path
+        // Use non-blocking begin() to avoid interfering with SwiftUI sheet state
+        panel.begin { [self] response in
+            if response == .OK, let url = panel.url {
+                todoStore.updateStoragePath(url)
+                dataPath = url.path
+            }
         }
     }
 
