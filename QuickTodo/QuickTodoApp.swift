@@ -52,7 +52,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotkeyManager: HotkeyManager!
 
     /// Monitor for clicks outside the popover
-    private var eventMonitor: Any?
+    private var eventMonitor: EventMonitorRef?
 
     // MARK: - Lifecycle
 

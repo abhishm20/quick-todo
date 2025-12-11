@@ -25,6 +25,9 @@ final class KeyboardHandler: ObservableObject {
     /// Selected indices for multi-select
     @Published var selectedIndices: Set<Int> = []
 
+    /// Index of item that should enter edit mode (set by Cmd+I, observed by ContentView)
+    @Published var editingRequestedForIndex: Int? = nil
+
     // MARK: - Properties
 
     /// Event monitor reference
@@ -34,6 +37,8 @@ final class KeyboardHandler: ObservableObject {
     var onToggle: ((Int) -> Void)?
     var onDelete: ((Set<Int>) -> Void)?
     var onClose: (() -> Void)?
+    var onCopy: ((Set<Int>) -> Void)?
+    var onOpenSettings: (() -> Void)?
     var getTodosCount: (() -> Int)?
 
     // MARK: - Lifecycle
@@ -80,10 +85,42 @@ final class KeyboardHandler: ObservableObject {
     /// Handles a keyboard event
     private func handleKeyEvent(_ event: NSEvent) -> Bool {
         let hasShift = event.modifierFlags.contains(.shift)
+        let hasCommand = event.modifierFlags.contains(.command)
         let todosCount = getTodosCount?() ?? 0
+        let keyCode = event.keyCode
 
-        switch event.keyCode {
-        case 125: // Down Arrow
+        // Handle Cmd+I for edit mode
+        if hasCommand && keyCode == KeyCode.i.rawValue {
+            if focusedIndex >= 0 && focusedIndex < todosCount {
+                editingRequestedForIndex = focusedIndex
+                return true
+            }
+            return false
+        }
+
+        // Handle Cmd+C for copy
+        if hasCommand && keyCode == KeyCode.c.rawValue {
+            if focusedIndex >= 0 || !selectedIndices.isEmpty {
+                let indicesToCopy: Set<Int>
+                if selectedIndices.isEmpty {
+                    indicesToCopy = [focusedIndex]
+                } else {
+                    indicesToCopy = selectedIndices
+                }
+                onCopy?(indicesToCopy)
+                return true
+            }
+            return false
+        }
+
+        // Handle Cmd+, for settings
+        if hasCommand && keyCode == KeyCode.comma.rawValue {
+            onOpenSettings?()
+            return true
+        }
+
+        switch keyCode {
+        case KeyCode.downArrow.rawValue:
             if hasShift {
                 extendSelectionDown(todosCount: todosCount)
             } else {
@@ -92,7 +129,7 @@ final class KeyboardHandler: ObservableObject {
             }
             return true
 
-        case 126: // Up Arrow
+        case KeyCode.upArrow.rawValue:
             if hasShift {
                 extendSelectionUp(todosCount: todosCount)
             } else {
@@ -101,11 +138,11 @@ final class KeyboardHandler: ObservableObject {
             }
             return true
 
-        case 53: // Escape
+        case KeyCode.escape.rawValue:
             onClose?()
             return true
 
-        case 36: // Return
+        case KeyCode.return.rawValue:
             if focusedIndex == -1 {
                 return false // Let input field handle it
             } else if focusedIndex >= 0 && focusedIndex < todosCount {
@@ -114,14 +151,14 @@ final class KeyboardHandler: ObservableObject {
             }
             return false
 
-        case 49: // Space
+        case KeyCode.space.rawValue:
             if focusedIndex >= 0 && focusedIndex < todosCount {
                 onToggle?(focusedIndex)
                 return true
             }
             return false
 
-        case 51, 117: // Backspace (51) or Forward Delete (117)
+        case KeyCode.delete.rawValue, KeyCode.forwardDelete.rawValue:
             if focusedIndex >= 0 || !selectedIndices.isEmpty {
                 deleteSelected(todosCount: todosCount)
                 return true
@@ -192,7 +229,10 @@ final class KeyboardHandler: ObservableObject {
                 return
             }
         } else {
-            indicesToDelete = selectedIndices
+            // Filter to only valid indices
+            let validIndices = selectedIndices.filter { $0 >= 0 && $0 < todosCount }
+            guard !validIndices.isEmpty else { return }
+            indicesToDelete = validIndices
         }
 
         onDelete?(indicesToDelete)

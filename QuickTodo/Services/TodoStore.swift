@@ -28,15 +28,24 @@ final class TodoStore: ObservableObject {
 
     // MARK: - Properties
 
-    /// The list of todos (automatically saved on change)
+    /// The list of todos
     @Published var todos: [Todo] = [] {
         didSet {
-            save()
+            scheduleSave()
         }
     }
 
+    /// Last save error (nil if save succeeded)
+    @Published private(set) var saveError: Error?
+
     /// File URL for todo persistence
     private var fileURL: URL
+
+    /// Task for debounced saving
+    private var saveTask: Task<Void, Never>?
+
+    /// Debounce interval for saves (500ms)
+    private static let saveDebounceNanoseconds: UInt64 = 500_000_000
 
     /// UserDefaults key for custom storage path
     private static let storagePathKey = "customStoragePath"
@@ -108,6 +117,9 @@ final class TodoStore: ObservableObject {
     func deleteTodo(id: UUID) {
         guard let index = todos.firstIndex(where: { $0.id == id }) else { return }
 
+        // Prevent double deletion
+        guard !todos[index].isDeleting else { return }
+
         // Mark as deleting (triggers strikethrough animation)
         todos[index].isDeleting = true
 
@@ -116,7 +128,10 @@ final class TodoStore: ObservableObject {
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
             withAnimation(.easeOut(duration: 0.3)) {
-                self.todos.removeAll { $0.id == todoId }
+                // Only remove if still exists and still marked for deletion
+                if let idx = self.todos.firstIndex(where: { $0.id == todoId && $0.isDeleting }) {
+                    self.todos.remove(at: idx)
+                }
             }
         }
     }
@@ -136,17 +151,17 @@ final class TodoStore: ObservableObject {
     ///
     /// - Parameter url: The new file URL for storage
     func updateStoragePath(_ url: URL) {
-        // Save current todos to new location
         let oldURL = fileURL
         fileURL = url
 
-        // Save to new location
-        save()
+        // Save to new location immediately (bypass debounce)
+        Task {
+            await saveImmediately()
+        }
 
         // Store preference
         UserDefaults.standard.set(url.path, forKey: Self.storagePathKey)
 
-        // Optionally: keep old file or delete it
         // For safety, we keep the old file
         print("QuickTodo: Moved storage from \(oldURL.path) to \(url.path)")
     }
@@ -158,9 +173,12 @@ final class TodoStore: ObservableObject {
         // If already at default, do nothing
         guard fileURL != newURL else { return }
 
-        // Save to default location
         fileURL = newURL
-        save()
+
+        // Save to default location immediately (bypass debounce)
+        Task {
+            await saveImmediately()
+        }
 
         // Clear preference
         UserDefaults.standard.removeObject(forKey: Self.storagePathKey)
@@ -172,13 +190,16 @@ final class TodoStore: ObservableObject {
 
     /// Loads todos from the JSON file.
     private func load() {
-        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+        let url = fileURL
+        guard FileManager.default.fileExists(atPath: url.path) else {
             todos = []
             return
         }
 
+        // Perform file I/O synchronously during init (acceptable for small files)
+        // For larger datasets, consider async loading with a loading state
         do {
-            let data = try Data(contentsOf: fileURL)
+            let data = try Data(contentsOf: url)
             let decoded = try JSONDecoder().decode([Todo].self, from: data)
             todos = decoded
         } catch {
@@ -187,15 +208,58 @@ final class TodoStore: ObservableObject {
         }
     }
 
-    /// Saves todos to the JSON file.
-    private func save() {
+    /// Schedules a debounced save operation.
+    ///
+    /// Multiple rapid changes will be batched into a single save
+    /// after the debounce interval (500ms) has passed.
+    private func scheduleSave() {
+        // Cancel any pending save
+        saveTask?.cancel()
+
+        // Schedule a new save after debounce interval
+        saveTask = Task { [weak self] in
+            do {
+                try await Task.sleep(nanoseconds: Self.saveDebounceNanoseconds)
+            } catch {
+                // Task was cancelled, don't save
+                return
+            }
+
+            guard !Task.isCancelled else { return }
+            await self?.performSave()
+        }
+    }
+
+    /// Performs the actual save to disk.
+    ///
+    /// Runs on a background thread to avoid blocking the UI.
+    private func performSave() async {
+        let todosToSave = todos
+        let url = fileURL
+
+        // Perform file I/O on background thread
         do {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            let data = try encoder.encode(todos)
-            try data.write(to: fileURL, options: .atomic)
+            try await Task.detached(priority: .utility) {
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+                let data = try encoder.encode(todosToSave)
+                try data.write(to: url, options: .atomic)
+            }.value
+
+            // Clear any previous error on success
+            saveError = nil
         } catch {
             print("QuickTodo: Failed to save todos: \(error)")
+            saveError = error
         }
+    }
+
+    /// Forces an immediate save, bypassing debounce.
+    ///
+    /// Use this when you need to ensure data is persisted immediately,
+    /// such as before changing storage paths.
+    func saveImmediately() async {
+        saveTask?.cancel()
+        await performSave()
     }
 }

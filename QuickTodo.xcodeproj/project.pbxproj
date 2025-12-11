@@ -16,6 +16,7 @@
 		A1000007 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000007 /* Assets.xcassets */; };
 		A1000008 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000B /* SettingsView.swift */; };
 		A1000009 /* KeyboardHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000C /* KeyboardHandler.swift */; };
+		A100000A /* KeyboardUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000D /* KeyboardUtils.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -31,6 +32,7 @@
 		A200000A /* QuickTodo.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = QuickTodo.entitlements; sourceTree = "<group>"; };
 		A200000B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A200000C /* KeyboardHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardHandler.swift; sourceTree = "<group>"; };
+		A200000D /* KeyboardUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardUtils.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -59,6 +61,7 @@
 				A4000004 /* Models */,
 				A4000005 /* Views */,
 				A4000006 /* Services */,
+				A4000008 /* Utils */,
 				A4000007 /* Resources */,
 				A2000008 /* Info.plist */,
 				A200000A /* QuickTodo.entitlements */,
@@ -108,6 +111,14 @@
 				A2000007 /* Assets.xcassets */,
 			);
 			path = Resources;
+			sourceTree = "<group>";
+		};
+		A4000008 /* Utils */ = {
+			isa = PBXGroup;
+			children = (
+				A200000D /* KeyboardUtils.swift */,
+			);
+			path = Utils;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -187,6 +198,7 @@
 				A1000006 /* TodoRowView.swift in Sources */,
 				A1000008 /* SettingsView.swift in Sources */,
 				A1000009 /* KeyboardHandler.swift in Sources */,
+				A100000A /* KeyboardUtils.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

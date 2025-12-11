@@ -49,6 +49,9 @@ final class HotkeyManager: ObservableObject {
     /// Reference to the event handler
     private var eventHandler: EventHandlerRef?
 
+    /// Reference to the registered hotkey
+    private var hotkeyRef: EventHotKeyRef?
+
     /// UserDefaults key for storing custom shortcut
     private static let shortcutKey = "globalShortcut"
 
@@ -130,7 +133,6 @@ final class HotkeyManager: ObservableObject {
 
         // Register the hotkey
         var hotkeyID = EventHotKeyID(signature: OSType(0x5154444F), id: 1) // "QTDO"
-        var hotkeyRef: EventHotKeyRef?
 
         let registerResult = RegisterEventHotKey(
             keyCombo.keyCode,
@@ -148,6 +150,13 @@ final class HotkeyManager: ObservableObject {
 
     /// Unregisters the global hotkey
     private func unregisterHotkey() {
+        // Unregister the hotkey first
+        if let hotkey = hotkeyRef {
+            UnregisterEventHotKey(hotkey)
+            hotkeyRef = nil
+        }
+
+        // Then remove the event handler
         if let handler = eventHandler {
             RemoveEventHandler(handler)
             eventHandler = nil

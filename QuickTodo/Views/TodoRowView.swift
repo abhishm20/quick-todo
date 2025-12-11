@@ -7,6 +7,29 @@
 
 import SwiftUI
 
+// MARK: - Todo Row Actions
+
+/// Consolidates all callback actions for a todo row.
+///
+/// Using a struct instead of multiple closure parameters improves readability
+/// and makes the TodoRowView initializer more concise.
+struct TodoRowActions {
+    /// Action when checkbox is toggled
+    var onToggle: () -> Void = {}
+
+    /// Action when todo should be deleted
+    var onDelete: () -> Void = {}
+
+    /// Action when text changes
+    var onTextChange: (String) -> Void = { _ in }
+
+    /// Callback when edit mode should start
+    var onStartEdit: () -> Void = {}
+
+    /// Callback when edit mode ends
+    var onEndEdit: () -> Void = {}
+}
+
 // MARK: - Todo Row View
 
 /// Displays a single todo item with checkbox and text.
@@ -29,14 +52,11 @@ struct TodoRowView: View {
     /// Whether this row is selected (multi-select)
     var isSelected: Bool = false
 
-    /// Action when checkbox is toggled
-    let onToggle: () -> Void
+    /// Whether this row is in edit mode (controlled by parent)
+    var isEditMode: Bool = false
 
-    /// Action when todo should be deleted
-    let onDelete: () -> Void
-
-    /// Action when text changes
-    let onTextChange: (String) -> Void
+    /// All callback actions for this row
+    var actions: TodoRowActions = TodoRowActions()
 
     /// Local text state for editing
     @State private var editedText: String = ""
@@ -76,7 +96,7 @@ struct TodoRowView: View {
 
     /// Checkbox toggle button
     private var checkboxView: some View {
-        Button(action: onToggle) {
+        Button(action: actions.onToggle) {
             Image(systemName: todo.isCompleted ? "checkmark.circle.fill" : "circle")
                 .font(.system(size: 18))
                 .foregroundColor(todo.isCompleted ? .accentColor : .secondary)
@@ -87,20 +107,38 @@ struct TodoRowView: View {
 
     /// Todo text display/edit field
     private var textView: some View {
-        TextField("", text: $editedText)
-            .textFieldStyle(.plain)
-            .font(.body)
-            .foregroundColor(textColor)
-            .strikethrough(todo.isCompleted || todo.isDeleting, color: strikethroughColor)
-            .focused($isEditing)
-            .onSubmit {
-                onTextChange(editedText)
+        Group {
+            if isEditMode {
+                TextField("", text: $editedText)
+                    .textFieldStyle(.plain)
+                    .focused($isEditing)
+                    .onSubmit {
+                        actions.onTextChange(editedText)
+                        actions.onEndEdit()
+                    }
+                    .onChange(of: isEditing) { _, editing in
+                        if !editing {
+                            actions.onTextChange(editedText)
+                            actions.onEndEdit()
+                        }
+                    }
+                    .onAppear {
+                        isEditing = true
+                    }
+            } else {
+                Text(todo.text)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        actions.onStartEdit()
+                    }
             }
-            .onChange(of: isEditing) { _, editing in
-                if !editing {
-                    onTextChange(editedText)
-                }
-            }
+        }
+        .font(.body)
+        .foregroundColor(textColor)
+        .strikethrough(todo.isCompleted || todo.isDeleting, color: strikethroughColor)
     }
 
     /// Background highlight for focused/selected state
@@ -147,38 +185,29 @@ struct TodoRowView: View {
     VStack(spacing: 0) {
         TodoRowView(
             todo: .constant(Todo(text: "Normal todo")),
-            isFocused: false,
-            isSelected: false,
-            onToggle: {},
-            onDelete: {},
-            onTextChange: { _ in }
+            isFocused: false
         )
 
         TodoRowView(
             todo: .constant(Todo(text: "Selected todo")),
             isFocused: false,
-            isSelected: true,
-            onToggle: {},
-            onDelete: {},
-            onTextChange: { _ in }
+            isSelected: true
         )
 
         TodoRowView(
             todo: .constant(Todo(text: "Focused todo")),
             isFocused: true,
-            isSelected: true,
-            onToggle: {},
-            onDelete: {},
-            onTextChange: { _ in }
+            isSelected: true
         )
 
         TodoRowView(
             todo: .constant(Todo(text: "Completed todo", isCompleted: true)),
-            isFocused: false,
-            isSelected: false,
-            onToggle: {},
-            onDelete: {},
-            onTextChange: { _ in }
+            isFocused: false
+        )
+
+        TodoRowView(
+            todo: .constant(Todo(text: "This is a very long todo item that should wrap to multiple lines when displayed in the todo list view")),
+            isFocused: false
         )
     }
     .frame(width: 320)

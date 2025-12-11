@@ -7,7 +7,6 @@
 
 import SwiftUI
 import AppKit
-import Carbon
 
 // MARK: - Content View
 
@@ -31,6 +30,9 @@ struct ContentView: View {
 
     /// Whether the input field should be focused
     @FocusState private var isInputFocused: Bool
+
+    /// Index of the item currently being edited (-1 for none)
+    @State private var editingIndex: Int = -1
 
     // MARK: - Body
 
@@ -70,6 +72,12 @@ struct ContentView: View {
         .onChange(of: keyboardHandler.focusedIndex) { _, newIndex in
             isInputFocused = (newIndex == -1)
         }
+        .onChange(of: keyboardHandler.editingRequestedForIndex) { _, newIndex in
+            if let index = newIndex {
+                editingIndex = index
+                keyboardHandler.editingRequestedForIndex = nil
+            }
+        }
         .sheet(isPresented: $showSettings) {
             SettingsView()
                 .environmentObject(todoStore)
@@ -88,7 +96,7 @@ struct ContentView: View {
 
             Spacer()
 
-            Text(formatKeyCombo(hotkeyManager.keyCombo))
+            Text(formatKeyCombo(keyCode: hotkeyManager.keyCombo.keyCode, modifiers: hotkeyManager.keyCombo.modifiers))
                 .font(.caption)
                 .foregroundColor(Color(NSColor.tertiaryLabelColor))
                 .padding(.horizontal, 6)
@@ -154,11 +162,16 @@ struct ContentView: View {
                             todo: binding(for: todo),
                             isFocused: keyboardHandler.focusedIndex == index,
                             isSelected: keyboardHandler.selectedIndices.contains(index),
-                            onToggle: { todoStore.toggleTodo(id: todo.id) },
-                            onDelete: { todoStore.deleteTodo(id: todo.id) },
-                            onTextChange: { newText in
-                                todoStore.updateTodo(id: todo.id, text: newText)
-                            }
+                            isEditMode: editingIndex == index,
+                            actions: TodoRowActions(
+                                onToggle: { todoStore.toggleTodo(id: todo.id) },
+                                onDelete: { todoStore.deleteTodo(id: todo.id) },
+                                onTextChange: { newText in
+                                    todoStore.updateTodo(id: todo.id, text: newText)
+                                },
+                                onStartEdit: { editingIndex = index },
+                                onEndEdit: { editingIndex = -1 }
+                            )
                         )
                         .id(todo.id)
                     }
@@ -200,6 +213,20 @@ struct ContentView: View {
         keyboardHandler.onClose = {
             NSApp.keyWindow?.close()
         }
+
+        keyboardHandler.onCopy = { [todoStore] indices in
+            let texts = indices.sorted().compactMap { index -> String? in
+                guard index >= 0 && index < todoStore.todos.count else { return nil }
+                return todoStore.todos[index].text
+            }
+            let combinedText = texts.joined(separator: "\n")
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(combinedText, forType: .string)
+        }
+
+        keyboardHandler.onOpenSettings = { [self] in
+            showSettings = true
+        }
     }
 
     // MARK: - Helpers
@@ -219,42 +246,6 @@ struct ContentView: View {
 
         todoStore.addTodo(text: text)
         newTodoText = ""
-    }
-
-    /// Formats a KeyCombo as a human-readable string
-    private func formatKeyCombo(_ combo: HotkeyManager.KeyCombo) -> String {
-        var result = ""
-
-        // Modifiers
-        if combo.modifiers & UInt32(controlKey) != 0 { result += "⌃" }
-        if combo.modifiers & UInt32(optionKey) != 0 { result += "⌥" }
-        if combo.modifiers & UInt32(shiftKey) != 0 { result += "⇧" }
-        if combo.modifiers & UInt32(cmdKey) != 0 { result += "⌘" }
-
-        // Key
-        result += keyCodeToString(combo.keyCode)
-
-        return result
-    }
-
-    /// Converts a key code to its string representation
-    private func keyCodeToString(_ keyCode: UInt32) -> String {
-        let keyMap: [UInt32: String] = [
-            0: "A", 1: "S", 2: "D", 3: "F", 4: "H", 5: "G", 6: "Z", 7: "X",
-            8: "C", 9: "V", 11: "B", 12: "Q", 13: "W", 14: "E", 15: "R",
-            16: "Y", 17: "T", 18: "1", 19: "2", 20: "3", 21: "4", 22: "6",
-            23: "5", 24: "=", 25: "9", 26: "7", 27: "-", 28: "8", 29: "0",
-            30: "]", 31: "O", 32: "U", 33: "[", 34: "I", 35: "P", 37: "L",
-            38: "J", 39: "'", 40: "K", 41: ";", 42: "\\", 43: ",", 44: "/",
-            45: "N", 46: "M", 47: ".", 49: "Space", 50: "`",
-            36: "↩", 48: "⇥", 51: "⌫", 53: "⎋",
-            122: "F1", 120: "F2", 99: "F3", 118: "F4", 96: "F5",
-            97: "F6", 98: "F7", 100: "F8", 101: "F9", 109: "F10",
-            103: "F11", 111: "F12",
-            123: "←", 124: "→", 125: "↓", 126: "↑"
-        ]
-
-        return keyMap[keyCode] ?? "?"
     }
 }
 
